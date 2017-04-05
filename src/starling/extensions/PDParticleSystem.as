@@ -10,12 +10,12 @@
 
 package starling.extensions
 {
-    import flash.display3D.Context3DBlendFactor;
-    
-    import starling.textures.Texture;
-    import starling.utils.deg2rad;
-    
-    public class PDParticleSystem extends ParticleSystem
+import flash.display3D.Context3DBlendFactor;
+
+import starling.textures.Texture;
+import starling.utils.deg2rad;
+
+public class PDParticleSystem extends ParticleSystem
     {
         private const EMITTER_TYPE_GRAVITY:int = 0;
         private const EMITTER_TYPE_RADIAL:int  = 1;
@@ -24,6 +24,9 @@ package starling.extensions
         private var mEmitterType:int;                       // emitterType
         private var mEmitterXVariance:Number;               // sourcePositionVariance x
         private var mEmitterYVariance:Number;               // sourcePositionVariance y
+        private var mPlayOnce:Boolean;
+        private var mUseEmissionRate:Boolean;
+        private var mStoredEmissionRate:Number;
         
         // particle configuration
         private var mMaxNumParticles:int;                   // maxParticles
@@ -67,10 +70,10 @@ package starling.extensions
         public function PDParticleSystem(config:XML, texture:Texture)
         {
             parseConfig(config);
-            
-            var emissionRate:Number = mMaxNumParticles / mLifespan;
-            super(texture, emissionRate, mMaxNumParticles, mMaxNumParticles,
+
+            super(texture, mStoredEmissionRate, mMaxNumParticles, mMaxNumParticles,
                   mBlendFactorSource, mBlendFactorDestination);
+            updateEmissionRate();
         }
         
         protected override function createParticle():Particle
@@ -156,7 +159,11 @@ package starling.extensions
             particle.rotation = startRotation;
             particle.rotationDelta = (endRotation - startRotation) / lifespan;
         }
-        
+        public override function advanceTime(passedTime:Number):void
+        {
+            if(playOnce && numParticles>=maxNumParticles) stop();
+            super.advanceTime(passedTime);
+        }
         protected override function advanceParticle(aParticle:Particle, passedTime:Number):void
         {
             var particle:PDParticle = aParticle as PDParticle;
@@ -211,13 +218,20 @@ package starling.extensions
         
         private function updateEmissionRate():void
         {
-            emissionRate = mMaxNumParticles / mLifespan;
+            if (!mUseEmissionRate) {
+                super.emissionRate = mMaxNumParticles / mLifespan;
+            } else {
+                super.emissionRate = mStoredEmissionRate;
+            }
         }
         
         private function parseConfig(config:XML):void
         {
             mEmitterXVariance = parseFloat(config.sourcePositionVariance.attribute("x"));
             mEmitterYVariance = parseFloat(config.sourcePositionVariance.attribute("y"));
+            mPlayOnce = parseInt(config.playOnce.attribute("enabled"));
+            mUseEmissionRate = parseInt(config.emissionRate.attribute("enabled"));
+            mStoredEmissionRate = parseInt(config.emissionRate.attribute("value"));
             mGravityX = parseFloat(config.gravity.attribute("x"));
             mGravityY = parseFloat(config.gravity.attribute("y"));
             mEmitterType = getIntValue(config.emitterType);
@@ -314,11 +328,22 @@ package starling.extensions
         public function get emitterYVariance():Number { return mEmitterYVariance; }
         public function set emitterYVariance(value:Number):void { mEmitterYVariance = value; }
 
+        public function get useEmissionRate():Boolean {return mUseEmissionRate;}
+        public function set useEmissionRate(value:Boolean):void {
+            mUseEmissionRate = value;
+            updateEmissionRate();
+        }
+
+        override public function set emissionRate(value:Number):void {
+            mStoredEmissionRate = value;
+            updateEmissionRate();
+        }
+
         public function get maxNumParticles():int { return mMaxNumParticles; }
         public function set maxNumParticles(value:int):void 
         { 
             maxCapacity = value;
-            mMaxNumParticles = maxCapacity; 
+            mMaxNumParticles = maxCapacity;
             updateEmissionRate(); 
         }
 
@@ -415,5 +440,8 @@ package starling.extensions
 
         public function get endColorVariance():ColorArgb { return mEndColorVariance; }
         public function set endColorVariance(value:ColorArgb):void { mEndColorVariance = value; }
+
+        public function get playOnce():Boolean { return mPlayOnce; }
+        public function set playOnce(value:Boolean):void { mPlayOnce = value; }
     }
 }
